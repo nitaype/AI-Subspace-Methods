@@ -113,9 +113,10 @@ class SubspaceNet(ParentModel):
         Kx_tag = torch.complex(Rx_real, Rx_imag).to(torch.complex128)  # Shape: [Batch size, N, N])
         # Apply Gram operation diagonal loading
         eps = self.__adjust_psd_eps()
+        Kx_tag = self.norm_layer(Kx_tag)
         Rz = gram_diagonal_overload(Kx=Kx_tag, eps=eps)  # Shape: [Batch size, N, N]
         # Feed surrogate covariance to the differentiable subspace algorithm
-        Rz = self.norm_layer(Rz)
+        # Rz = self.norm_layer(Rz)
         return Rz
 
     def forward(self, x: torch.Tensor, sources_num: torch.tensor = None):
