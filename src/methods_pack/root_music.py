@@ -17,7 +17,7 @@ class RootMusic(SubspaceMethod):
 
     def forward(self, cov: torch.Tensor, sources_num: torch.tensor = None):
         batch_size = cov.shape[0]
-        _, noise_subspace, source_estimation, _ = self.subspace_separation(cov, number_of_sources=sources_num)
+        _, noise_subspace, source_estimation, l_eig = self.subspace_separation(cov, number_of_sources=sources_num)
         poly_generator = torch.bmm(noise_subspace, noise_subspace.conj().transpose(1, 2))
         diag_sum = self.sum_of_diag(poly_generator)
         roots = self.find_roots(diag_sum)
@@ -27,7 +27,7 @@ class RootMusic(SubspaceMethod):
         # the actual prediction is for roots that are closest to the unit circle.
         roots = self.extract_roots_closest_unit_circle(roots, k=sources_num)
         angles_prediction = self.get_doa_from_roots(roots)
-        return angles_prediction, source_estimation
+        return angles_prediction, source_estimation, l_eig
 
     def get_doa_from_roots(self, roots):
         roots_phase = torch.angle(roots)
@@ -88,8 +88,8 @@ class RootMusic(SubspaceMethod):
         else:
             # Conventional
             Rx = self.pre_processing(x, mode="sample")
-        angles_prediction, sources_num_estimation = self(Rx, sources_num=sources_num)
-        rmspe = self.criterion(angles_prediction, angles).sum().item()
+        angles_prediction, sources_num_estimation, _ = self(Rx, sources_num=sources_num)
+        rmspe = self.criterion(angles_prediction.to(self.device), angles).sum().item()
         acc = self.source_estimation_accuracy(sources_num, sources_num_estimation)
 
         return rmspe, acc, test_length

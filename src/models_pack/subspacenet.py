@@ -79,6 +79,7 @@ class SubspaceNet(ParentModel):
         # Rx_tau shape: [Batch size, tau, 2N, N]
         # N = x.shape[-1]
         batch_size, _, _, N = x0.shape
+        empirical_cov = torch.complex(x0[:, 0,:N], x0[:, 0, N:])
         ############################
         ## Architecture flow ##
         # CNN block #1
@@ -165,17 +166,9 @@ class SubspaceNet(ParentModel):
             return noise_subspace, source_estimation, eigen_regularization
         else:
             method_output = self.diff_method(cov, sources_num)
-            if isinstance(self.diff_method, RootMusic):
-                pred_angles, pred_all_angles, roots = method_output
-                return pred_angles, pred_all_angles, roots
-            elif isinstance(self.diff_method, ESPRIT):
-                # Esprit output
+            if isinstance(self.diff_method, (RootMusic, ESPRIT, MUSIC)):
                 pred_angles, sources_estimation, eigen_regularization = method_output
-                return pred_angles, sources_estimation, eigen_regularization
-            elif isinstance(self.diff_method, MUSIC):
-                pred_angles, sources_estimation, eigen_regularization = method_output
-                return pred_angles, sources_estimation, eigen_regularization
-
+                return pred_angles.to(self.device), sources_estimation, eigen_regularization
             else:
                 raise Exception(f"SubspaceNet.forward: Method {self.diff_method} is not defined for SubspaceNet")
 
@@ -472,7 +465,7 @@ class SubspaceNet(ParentModel):
         """
         if self.field_type == "far":
             if diff_method.startswith("root_music"):
-                self.diff_method = root_music
+                self.diff_method = RootMusic(system_model=system_model, model_order_estimation=self.regularization)
             elif diff_method.startswith("esprit"):
                 self.diff_method = ESPRIT(system_model=system_model, model_order_estimation=self.regularization)
             elif diff_method.endswith("music_1d"):
