@@ -8,7 +8,7 @@ import torch.nn as nn
 from src.metrics import RMSPELoss, CartesianLoss, MusicSpectrumLoss
 from src.models_pack.parent_model import ParentModel
 from src.system_model import SystemModel
-from src.utils import gram_diagonal_overload, validate_constant_sources_number, L2NormLayer, AntiRectifier, TraceNorm
+from src.utils import gram_diagonal_overload, validate_constant_sources_number, L2NormLayer, AntiRectifier, TraceNorm, LearnableSkipConnection
 
 from src.methods_pack.music import MUSIC
 from src.methods_pack.esprit import ESPRIT
@@ -19,7 +19,7 @@ from src.methods_pack.beamformer import Beamformer
 class SubspaceNet(ParentModel):
     def __init__(self, tau: int, diff_method: str = "root_music", train_loss_type: str="rmspe",
                  system_model: SystemModel = None, field_type: str = "far", regularization: str = None, variant: str = "small",
-                  norm_layer: bool=True, psd_epsilon: float=.1, batch_norm: bool=False):
+                  norm_layer: bool=True, psd_epsilon: float=.01, batch_norm: bool=False, skip_connection: bool=False):
         """Initializes the SubspaceNet model.
 
         Args:
@@ -48,16 +48,19 @@ class SubspaceNet(ParentModel):
         self.conv1 = nn.Conv2d(self.tau, 16, kernel_size=2)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=2)
         self.conv3 = nn.Conv2d(64, 64, kernel_size=2)
-        self.extra_conv4 = nn.Identity() # initialize as identity, set up in the __setup_big_ssn
-        self.extra_deconv1 = nn.Identity() # initialize as identity, set up in the __setup_big_ssn
+        self.extra_conv4 = nn.Identity() # initialize as identity, set up in the __setup_model_variant
+        self.extra_deconv1 = nn.Identity() # initialize as identity, set up in the __setup_model_variant
         self.deconv2 = nn.ConvTranspose2d(128, 32, kernel_size=2)
         self.deconv3 = nn.ConvTranspose2d(64, 16, kernel_size=2)
         self.deconv4 = nn.ConvTranspose2d(32, 1, kernel_size=2)
         self.drop_out = nn.Dropout(self.p)
         self.antirectifier = AntiRectifier()
+        self.skip_connection = nn.Identity() # initialize as identity, set up in the __setup_skip_connection
+        
         self.__setup_model_variant(variant)
         self.__setup_norm_layer(norm_layer)
         self.__setup_batch_norm(batch_norm)
+        self.__setup_skip_connection(skip_connection)
 
         # set model training parameters
         self.train_loss, self.validation_loss, self.test_loss, self.test_loss_separated = None, None, None, None
@@ -115,7 +118,8 @@ class SubspaceNet(ParentModel):
         # Apply Gram operation diagonal loading
         eps = self.__adjust_psd_eps()
         Kx_tag = self.norm_layer(Kx_tag)
-        Rz = gram_diagonal_overload(Kx=Kx_tag, eps=eps)  # Shape: [Batch size, N, N]
+        Rz = gram_diagonal_overload(Kx=Kx_tag, eps=eps) # Shape: [Batch size, N, N]
+        Rz = self.skip_connection(Rz, empirical_cov) # Shape: [Batch size, N, N]
         # Feed surrogate covariance to the differentiable subspace algorithm
         # Rz = self.norm_layer(Rz)
         return Rz
@@ -232,6 +236,10 @@ class SubspaceNet(ParentModel):
             Rx_tau[:, i, :, :] = Rx_lag
 
         return Rx_tau
+
+    def __setup_skip_connection(self, skip_connection: bool):
+        if skip_connection:
+            self.skip_connection = LearnableSkipConnection(alpha=0.0)
 
     def __setup_model_variant(self, variant: str):
         if variant in ["big", "V2"]:

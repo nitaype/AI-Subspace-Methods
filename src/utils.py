@@ -72,19 +72,21 @@ def validate_constant_sources_number(number_of_sources: torch.tensor):
                          f"Number of sources in the batch is not equal for all samples.")
 
 def initialize_data_paths(path: Path):
-    datasets_path = path / "datasets"
-    simulations_path = path / "simulations"
-    saving_path = path / "weights"
+    plot_path = path / "plots"
+    data_path = path / "data"
+    datasets_path = data_path / "datasets"
+    simulations_path = data_path / "simulations"
+    saving_path = data_path / "weights"
 
     # create folders if not exists
+    plot_path.mkdir(parents=True, exist_ok=True)
     datasets_path.mkdir(parents=True, exist_ok=True)
     (datasets_path / "train").mkdir(parents=True, exist_ok=True)
     (datasets_path / "test").mkdir(parents=True, exist_ok=True)
     simulations_path.mkdir(parents=True, exist_ok=True)
     saving_path.mkdir(parents=True, exist_ok=True)
-    (saving_path / "final_models").mkdir(parents=True, exist_ok=True)
 
-    return datasets_path, simulations_path, saving_path
+    return datasets_path, simulations_path
 
 def sample_covariance(x: torch.Tensor) -> torch.Tensor:
     """
@@ -428,7 +430,7 @@ def gram_diagonal_overload(Kx: torch.Tensor, eps: float):
 
     # Kx_garm = torch.matmul(torch.transpose(Kx.conj(), 1, 2).to("cpu"), Kx.to("cpu")).to(device)
     Kx_garm = torch.bmm(Kx.conj().transpose(1, 2), Kx)
-    eps_addition = (eps * torch.diag(torch.ones(Kx_garm.shape[-1]))).to(device)
+    eps_addition = (eps * torch.diag(torch.ones(Kx_garm.shape[-1], device=device))).to(device)
     Kx_Out = Kx_garm + eps_addition
 
     # check if the matrix is Hermitian - A^H = A
@@ -525,13 +527,15 @@ class AntiRectifier(nn.Module):
         return torch.cat((self.relu(x), self.relu(-x)), 1)
 
 class L2NormLayer(nn.Module):
-    def __init__(self, dim=(1, 2), eps=1e-6):
+    def __init__(self, dim=(1, 2), eps=1e-8):
         super(L2NormLayer, self).__init__()
         self.dim = dim
         self.eps = eps
 
     def forward(self, x):
-        return torch.nn.functional.normalize(x, p=2, dim=self.dim, eps=self.eps) + self.eps * torch.diag(torch.ones(x.shape[-1], device=x.device))
+        return torch.nn.functional.normalize(x, p=2, dim=self.dim, eps=self.eps)
+        # norm = torch.sqrt(torch.norm(x, p=2, dim=self.dim, keepdim=True)) + self.eps
+        # return x / norm
 
 class TraceNorm(nn.Module):
     def __init__(self, eps=1e-8):
@@ -542,6 +546,21 @@ class TraceNorm(nn.Module):
         trace = torch.real(Rz.diagonal(dim1=-2, dim2=-1).sum(-1)).clamp(min=self.eps)  # shape [B]
         trace = trace.view(-1, 1, 1)
         return Rz / trace
+
+class LearnableSkipConnection(nn.Module):
+    def __init__(self, alpha: float = 0.0):
+        """Initializes the learnable skip connection.
+        Args:
+            alpha (float): Initial value for the learnable parameter.
+        """
+        super(LearnableSkipConnection, self).__init__()
+        self.alpha = nn.Parameter(torch.tensor(alpha), requires_grad=True)
+
+    def forward(self, x1, x2):
+        return x1 + torch.clamp(self.alpha, min=0.0, max=1.0) * x2
+    
+    def __repr__(self):
+        return f"LearnableSkipConnection(alpha={self.alpha.item()})"
 
 
 if __name__ == "__main__":
