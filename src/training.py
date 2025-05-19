@@ -157,7 +157,7 @@ class Trainer:
                 ############################################################################################################
                 # Back-propagation stage
                 try:
-                    train_loss.backward(retain_graph=True)
+                    train_loss.backward() # retain_graph=True
                 except RuntimeError as r:
                     raise Exception(f"linalg error: \n{r}")
 
@@ -201,15 +201,22 @@ class Trainer:
             self.__adjust_diff_method_temperature(epoch)
 
         # Training complete
-        time_elapsed = time.time() - since
-        print("\n--- Training summary ---")
-        print(f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s")
-        print(f"Minimal Validation loss: {self.min_valid_loss:4f} at epoch {self.best_epoch}")
+        self.__train_summary(since)
         self.__plot_res()
         self.__save_final_model(save_final)
         # close wandb connection
         self.__finish_wandb()
         return self.model
+    
+    def __train_summary(self, since: int):
+        print("\n------------------------------")
+        print("------ Training summary ------")
+        time_elapsed = time.time() - since
+        print(f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s")
+        print(f"Minimal Validation loss: {self.min_valid_loss:4f} at epoch {self.best_epoch}")
+        print(f"Best model weights saved in {self.checkpoint_path / self.model.get_model_file_name()}.pt")
+        print(f"Final model weights saved in {self.final_model_checkpoint}.pt")
+        print("------------------------------")
 
     def __report_results(self, epoch, epoch_train_loss, epoch_train_acc, valid_loss, eigenregularization=None):
         result_txt = (f"[Epoch : {epoch + 1}/{self.training_params.get('epochs', 10)}]"

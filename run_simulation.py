@@ -22,6 +22,9 @@ from src.utils import set_unified_seed, initialize_data_paths, print_loss_result
 
 
 def __run_simulation(**kwargs):
+    # Initialize seed
+    set_unified_seed()
+
     SIMULATION_COMMANDS = kwargs["simulation_commands"]
     SYSTEM_MODEL_PARAMS = kwargs["system_model_params"]
     MODEL_CONFIG = kwargs["model_config"]
@@ -42,16 +45,11 @@ def __run_simulation(**kwargs):
         print("Training objective - ", TRAINING_PARAMS.get('training_objective'))
 
     now = datetime.now()
-    plot_path = Path(__file__).parent / "plots"
-    plot_path.mkdir(parents=True, exist_ok=True)
     dt_string_for_save = now.strftime("%d_%m_%Y_%H_%M")
     # torch.set_printoptions(precision=12)
 
-    # Initialize seed
-    set_unified_seed()
-
     # Initialize paths
-    datasets_path, simulations_path, saving_path = initialize_data_paths(Path(__file__).parent / "data")
+    datasets_path, simulations_path = initialize_data_paths(Path(__file__).parent)
 
     # Saving simulation scores to external file
     suffix = ""
@@ -89,9 +87,6 @@ def __run_simulation(**kwargs):
     # Define samples size
     samples_size = TRAINING_PARAMS["samples_size"]  # Overall dateset size
     train_test_ratio = TRAINING_PARAMS["train_test_ratio"]  # training and testing datasets ratio
-    # Sets simulation filename
-    # simulation_filename = get_simulation_filename(system_model_params=system_model_params,
-    #                                               model_config=model_config)
     # Print new simulation intro
     print("------------------------------------")
     print("---------- New Simulation ----------")
@@ -111,7 +106,7 @@ def __run_simulation(**kwargs):
             except Exception as e:
                 print(e)
                 print("#############################################")
-                print("load_datasets: Error loading train dataset")
+                print("load_datasets: Error loading train dataset, creating new dataset")
                 print("#############################################")
                 create_data = True
                 load_data = False
@@ -126,7 +121,7 @@ def __run_simulation(**kwargs):
             except Exception as e:
                 print(e)
                 print("#############################################")
-                print("load_datasets: Error loading test dataset")
+                print("load_datasets: Error loading test dataset, creating new dataset")
                 print("#############################################")
                 create_data = True
                 load_data = False
@@ -147,9 +142,10 @@ def __run_simulation(**kwargs):
                 true_range=TRAINING_PARAMS["true_range_train"],
                 phase="train",
             )
-            print(f"Create the data took {time.time() - start} sec")
+            print(f"Create the train data took {time.time() - start} sec")
         if evaluate_mode:
             # Generate test dataset
+            start = time.time()
             generic_test_dataset, _ = create_dataset(
                 samples_model=samples_model,
                 samples_size=int(train_test_ratio * samples_size),
@@ -159,6 +155,7 @@ def __run_simulation(**kwargs):
                 true_range=TRAINING_PARAMS["true_range_test"],
                 phase="test",
             )
+            print(f"Create the test data took {time.time() - start} sec")
 
     if train_model:
         # Generate model configuration
@@ -191,12 +188,11 @@ def __run_simulation(**kwargs):
     if evaluate_mode:
         if not train_model:
             model = None
-        # Define loss measure for evaluation
-        if isinstance(system_model_params.M, int):
+        if isinstance(system_model_params.M, int): # if M is constant over the dataset, use a simple collate function
             generic_test_dataset = torch.utils.data.DataLoader(generic_test_dataset,
                                                                 batch_size=100,
                                                                 shuffle=False)
-        else:
+        else: # if M is not constant over the dataset, use a batch sampler to create batches of the same size
             batch_sampler_test = SameLengthBatchSampler(generic_test_dataset, batch_size=100)
             generic_test_dataset = torch.utils.data.DataLoader(generic_test_dataset,
                                                            collate_fn=collate_fn,
@@ -212,13 +208,14 @@ def __run_simulation(**kwargs):
             subspace_methods=EVALUATION_PARAMS["subspace_methods"],
             model_tmp=model
         )
-        # plt.show()
-        print("END OF EVALUATION")
+        print("-------------------------------------")
+        print("--------- End of Evaluation ---------")
+        print("-------------------------------------")
         if save_to_file:
             sys.stdout.close()
             sys.stdout = orig_stdout
         return loss
-    return
+    return None
 
 
 def run_simulation(**kwargs):
@@ -229,6 +226,7 @@ def run_simulation(**kwargs):
     - SNR: a list of SNR values to be tested
     - T: a list of number of snapshots to be tested
     - eta: a list of steering vector error values to be tested
+    - M: a list of number of sources to be tested
     """
     if kwargs["scenario_dict"] == {}:
         loss = __run_simulation(**kwargs)

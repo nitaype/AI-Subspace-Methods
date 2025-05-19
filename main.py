@@ -31,6 +31,7 @@ import argparse
 os.system("cls||clear")
 plt.close("all")
 
+# if you want to run the simulation with different parameters, you can uncomment the following lines and set the values
 scenario_dict = {
     # "SNR": [-10, -5, 0, 5, 10],
     # "T": [10, 20, 30, 50, 70, 100],
@@ -39,13 +40,13 @@ scenario_dict = {
 }
 
 simulation_commands = {
-    "SAVE_TO_FILE": False,
-    "CREATE_DATA": False,
-    "SAVE_DATASET": True,
-    "LOAD_MODEL": False,
-    "TRAIN_MODEL": True,
-    "SAVE_MODEL": True,
-    "EVALUATE_MODE": True,
+    "SAVE_TO_FILE": False, # if true, the logs will be saved to a file
+    "CREATE_DATA": True, # if true, a new dataset will be created
+    "SAVE_DATASET": False, # if true, the dataset will be saved to a file
+    "LOAD_MODEL": False, # if true, the model will be loaded from a file
+    "TRAIN_MODEL": True, # if true, the model will be trained
+    "SAVE_MODEL": False, # if true, the model will be saved to a file
+    "EVALUATE_MODE": True, # if true, a test will be performed
     "PLOT_RESULTS": True,  # if True, the learning curves will be plotted
     "PLOT_LOSS_RESULTS": True,  # if True, the RMSE results of evaluation will be plotted
     "PLOT_ACC_RESULTS": True,  # if True, the accuracy results of evaluation will be plotted
@@ -54,12 +55,12 @@ simulation_commands = {
 
 system_model_params = {
     "N": 15,  # number of antennas
-    "M": 2,  # number of sources
+    "M": (2, 7),  # number of sources
     "T": 100,  # number of snapshots
     "snr": 10,  # if defined, values in scenario_dict will be ignored
     "field_type": "near",  # Near, Far
     "signal_type": "Narrowband",  # Narrowband, broadband
-    "signal_nature": "coherent",  # if defined, values in scenario_dict will be ignored
+    "signal_nature": "non-coherent",  # if defined, values in scenario_dict will be ignored
     "eta": 0.0,  # steering vector uniform error variance with respect to the wavelength.
     "bias": 0, # steering vector bias error
     "sv_noise_var": 0.0, # steering vector addative gaussian error noise variance
@@ -78,10 +79,11 @@ if model_config.get("model_type") == "SubspaceNet":
     model_config["model_params"]["train_loss_type"] = "music_spectrum"  # music_spectrum, rmspe, beamformerloss
     model_config["model_params"]["tau"] = 8
     model_config["model_params"]["field_type"] = "Near"  # Far, Near
-    model_config["model_params"]["regularization"] = None # aic, mdl, threshold, None
+    model_config["model_params"]["regularization"] = "aic" # aic, mdl, threshold, None
     model_config["model_params"]["variant"] = "small"  # big, small
     model_config["model_params"]["norm_layer"] = True
     model_config["model_params"]["batch_norm"] = False
+    model_config["model_params"]["skip_connection"] = True
 
 elif model_config.get("model_type") == "DCD-MUSIC":
     model_config["model_params"]["tau"] = 8
@@ -96,11 +98,11 @@ elif model_config.get("model_type") == "DeepCNN":
     model_config["model_params"]["grid_size"] = 361
 
 training_params = {
-    "samples_size": 4096,
+    "samples_size": 4000,
     "train_test_ratio": 0.1,
     "training_objective": "angle, range",  # angle, range, source_estimation
-    "batch_size": 128,
-    "epochs": 50,
+    "batch_size": 32,
+    "epochs": 10,
     "optimizer": "Adam",  # Adam, SGD
     "scheduler": "ReduceLROnPlateau",  # StepLR, ReduceLROnPlateau
     "learning_rate": 0.001,
@@ -158,7 +160,7 @@ evaluation_params = {
     "subspace_methods": [
         # "CCRB",
          "2D-MUSIC",
-         "Beamformer",
+        #  "Beamformer",
         # "CS_Estimator",
         # "ESPRIT",
         # "1D-MUSIC",

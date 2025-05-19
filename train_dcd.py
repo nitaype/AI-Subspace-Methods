@@ -22,13 +22,13 @@ number_snapshots = 100
 snr = 10
 field_type = "Near"
 signal_type = "narrowband"
-signal_nature = "coherent"
+signal_nature = "non-coherent"
 err_loc_sv = 0.0
 wavelength = 1
 tau = 8
-sample_size = 4096
-batch_size = 128
-epochs = 50
+sample_size = 4000
+batch_size = 32
+epochs = 10
 optimizer = "Adam"
 scheduler = "ReduceLROnPlateau"
 learning_rate = 0.001
@@ -57,15 +57,13 @@ def train_dcd_music(*args, **kwargs):
     print(f"Training model - DCD-MUSIC, {'all training steps' if not skip_first_step and not skip_second_step else 'partly training'}")
 
     now = datetime.now()
-    plot_path = Path(__file__).parent / "plots"
-    plot_path.mkdir(parents=True, exist_ok=True)
     dt_string_for_save = now.strftime("%d_%m_%Y_%H_%M")
 
     # Initialize seed
     set_unified_seed()
 
     # Initialize paths
-    datasets_path, simulations_path, saving_path = initialize_data_paths(Path(__file__).parent / "data")
+    datasets_path, simulations_path = initialize_data_paths(Path(__file__).parent / "data")
 
     # Saving simulation scores to external file
     suffix = ""
