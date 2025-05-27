@@ -180,11 +180,11 @@ class TimeSeriesDataset(Dataset):
         self.is_constant_M = is_constant_M
         self.path = None
         self.len = None
-        self.h5f = None
+        # self.h5f = None
 
-    def _open_h5_file(self):
-        if self.h5f is None:
-            self.h5f = h5py.File(self.path, 'r')
+    # def _open_h5_file(self):
+    #     if self.h5f is None:
+    #         self.h5f = h5py.File(self.path, 'r')
 
     def __len__(self):
         if self.len is None:
@@ -196,10 +196,10 @@ class TimeSeriesDataset(Dataset):
         if self.path is None:
             return self.X[idx], self.M[idx], self.Y[idx]
         else:
-            self._open_h5_file()
-            x = torch.tensor(self.h5f[f'X/tensor_{idx}'][:])
-            y = torch.tensor(self.h5f[f'Y/label_{idx}'][:])
-            m = int(self.h5f['M'][idx])
+            with h5py.File(self.path, 'r') as f:
+                x = torch.tensor(f[f'X/tensor_{idx}'][:])
+                y = torch.tensor(f[f'Y/label_{idx}'][:])
+                m = int(f['M'][idx])
             return x, m, y
 
     def get_dataloaders(self, batch_size):
@@ -254,35 +254,34 @@ class TimeSeriesDataset(Dataset):
 
     def load(self, path):
         self.path = path
-        self._open_h5_file()
-        M = self.h5f['M']
-        self.len = len(M)
-        self.is_constant_M = len(set(M)) == 1
-
+        with h5py.File(path, 'r') as f:
+            M = f['M'][:]
+            self.len = len(M)
+            self.is_constant_M = len(set(M)) == 1
         return self
 
-    def close(self):
-        """ Close the HDF5 file if it was opened """
-        if self.h5f is not None:
-            self.h5f.close()
-            self.h5f = None
+    # def close(self):
+    #     """ Close the HDF5 file if it was opened """
+    #     if self.h5f is not None:
+    #         self.h5f.close()
+    #         self.h5f = None
 
-    def __del__(self):
-        """ Ensure file is closed when the object is deleted """
-        self.close()
+    # def __del__(self):
+    #     """ Ensure file is closed when the object is deleted """
+    #     self.close()
 
-def worker_init_fn(worker_id):
-    """ Ensure each worker has its own HDF5 file connection. """
-    worker_info = torch.utils.data.get_worker_info()
-    dataset = worker_info.dataset
+# def worker_init_fn(worker_id):
+#     """ Ensure each worker has its own HDF5 file connection. """
+#     worker_info = torch.utils.data.get_worker_info()
+#     dataset = worker_info.dataset
 
-    # If dataset is a Subset, access the original dataset
-    if isinstance(dataset, torch.utils.data.Subset):
-        dataset = dataset.dataset
+#     # If dataset is a Subset, access the original dataset
+#     if isinstance(dataset, torch.utils.data.Subset):
+#         dataset = dataset.dataset
 
-    # Ensure the dataset has a path and open the HDF5 file
-    if dataset.path is not None:
-        dataset._open_h5_file()
+#     # Ensure the dataset has a path and open the HDF5 file
+#     if dataset.path is not None:
+#         dataset._open_h5_file()
 
 def collate_fn(batch):
     """

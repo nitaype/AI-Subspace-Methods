@@ -57,7 +57,7 @@ system_model_params = {
     "M": 2,  # number of sources
     "T": 100,  # number of snapshots
     "snr": 10,  # if defined, values in scenario_dict will be ignored
-    "field_type": "near",  # Near, Far
+    "field_type": "far",  # Near, Far
     "signal_type": "Narrowband",  # Narrowband, broadband
     "signal_nature": "coherent",  # if defined, values in scenario_dict will be ignored
     "eta": 0.0,  # steering vector uniform error variance with respect to the wavelength.
@@ -74,10 +74,10 @@ model_config = {
     "model_params": {}
 }
 if model_config.get("model_type") == "SubspaceNet":
-    model_config["model_params"]["diff_method"] = "music_2D"  # esprit, music_1D, music_2D, beamformer
+    model_config["model_params"]["diff_method"] = "root_music"  # esprit, music_1D, music_2D, beamformer
     model_config["model_params"]["train_loss_type"] = "music_spectrum"  # music_spectrum, rmspe, beamformerloss
     model_config["model_params"]["tau"] = 8
-    model_config["model_params"]["field_type"] = "Near"  # Far, Near
+    model_config["model_params"]["field_type"] = "far"  # Far, Near
     model_config["model_params"]["regularization"] = None # aic, mdl, threshold, None
     model_config["model_params"]["variant"] = "small"  # big, small
     model_config["model_params"]["norm_layer"] = True
@@ -100,7 +100,7 @@ training_params = {
     "train_test_ratio": 0.1,
     "training_objective": "angle, range",  # angle, range, source_estimation
     "batch_size": 128,
-    "epochs": 50,
+    "epochs": 10,
     "optimizer": "Adam",  # Adam, SGD
     "scheduler": "ReduceLROnPlateau",  # StepLR, ReduceLROnPlateau
     "learning_rate": 0.001,
